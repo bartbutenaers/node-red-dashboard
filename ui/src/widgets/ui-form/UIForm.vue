@@ -4,6 +4,7 @@
         <div class="nrdb-ui-form-rows" :class="{'nrdb-ui-form-rows--split': props.splitLayout}">
             <div v-for="row in options" :key="row.key" class="nrdb-ui-form-row" :data-form="`form-row-${row.key}`">
                 <v-checkbox v-if="row.type === 'checkbox'" v-model="input[row.key]" :label="row.label" hide-details="auto" />
+                <v-select v-else-if="row.type === 'dropdown'" v-model="input[row.key]" class="nrdb-ui-widget" :label="row.label" :class="{'active': state}" hide-details="auto" color="primary" />
                 <v-switch v-else-if="row.type === 'switch'" v-model="input[row.key]" class="nrdb-ui-widget" :label="row.label" :class="{'active': state}" hide-details="auto" color="primary" />
                 <v-textarea
                     v-else-if="row.type === 'multiline'"
@@ -79,7 +80,7 @@ export default {
                         [key]: this.input[key]
                     }
                 }, {})
-            // Prevent sending null for switch and combobox, if type number send as Number or null if nothing present on text field and if other fields not present, send empty string
+            // Prevent sending null for switch and checkbox, if type number send as Number or null if nothing present on text field and if other fields not present, send empty string
             options.forEach(opt => {
                 if (opt.type === 'checkbox' || opt.type === 'switch') {
                     if (typeof (this.input[opt.key]) === 'undefined' || this.input[opt.key] === null) {

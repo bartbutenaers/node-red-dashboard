@@ -1,6 +1,7 @@
 {
     "ui-form": {
         "label": {
+            "dropdown": "Dropdown",
             "group": "Group",
             "size": "Size",
             "label": "Label",
