@@ -63,7 +63,7 @@
             labelStyle: function () { return this.name ? 'node_label_italic' : '' },
             oneditprepare: function () {
                 const node = this
-
+debugger
                 if ($('#node-input-submit').val() === null) { $('#node-input-submit').val('submit') }
                 if ($('#node-input-cancel').val() === null) { $('#node-input-cancel').val('cancel') }
                 // if this groups parent is a subflow template, set the node-config-input-width and node-config-input-height up
@@ -222,31 +222,61 @@
                     }
                 })
 
-                let dropdownOptionsList = $("#node-input-dropdown-options-container").css('min-height','200px').editableList({
-                    header: $("<div>").css('padding-left','32px').append($.parseHTML(
-                        "<div style='width:80%; display:inline-grid; margin-left:5px; margin-right:5px'><b>Key</b></div>" )),
+                let dropdownOptionsList = $('#node-input-dropdown-options-container').css('min-height','150px')
+                                                                                     .css('min-width','450px')
+                                                                                     .editableList({
+                    header: $('<div>').css('margin-left','28px')
+                                      .css('margin-right','28px')
+                                      .css('padding-right','0px')
+                                      .append($.parseHTML("<div style='width:20%; margin-left:5px; margin-right:5px; display: inline-grid'>" + c_('label.dropdown') + "</div>" +
+                                                          "<div style='width:20%; margin-left:5px; margin-right:5px; display: inline-grid'>" + c_('label.key') + "</div>" +
+                                                          "<div style='width:20%; margin-left:5px; margin-right:5px; display: inline-grid' data-i18n='node-red:common.label.name'></div>")),
                     addItem: function(container, i, option) {
-                        // When the 'add' button is clicked, option will contain {} instead of ''
-                        if (Object.keys(option).length === 0 && option.constructor === Object) {
-                            option = ''
-                        }
-
-                        // Add a new row to the editableList
                         let row = $('<div/>').appendTo(container)
 
-                        // Column 1
-                        let keyField = $('<input/>',{class:"node-input-key",type:"text"}).css({"width":"80%","margin-left":"5px","margin-right":"5px"}).appendTo(row)
-                        keyField.val(option.key)
+                        // Dropdown name field
+                        let dropdownNameField = $('<input/>').addClass('node-input-option-dropdown')
+                                                             .attr('type','text')
+                                                             .css('width','20%')
+                                                             .css('margin-left','5px')
+                                                             .css('margin-right','5px')
+                                                             .appendTo(row)
+                        /*TODO fill dropdownNameField options
+                        $(supportedTypes).each(function () {
+                            let isSelected = false
+                            if (option.type === this.val) {
+                                isSelected = true
+                            }
+                            dropdownNameField.append($('<option>').attr('value', this.val).text(this.text).prop('selected', isSelected))
+                        })*/
+
+                        // Key field
+                        let keyField = $('<input/>').addClass('node-input-option-key')
+                                                    .attr('type','text')
+                                                    .attr('placeholder',c_('label.egName'))
+                                                    .css('width','20%')
+                                                    .css('margin-left','5px')
+                                                    .css('margin-right','5px')
+                                                    .val(option.key)
+                                                    .appendTo(row)
+
+                        // Label field
+                        let labelField = $('<input/>').addClass('node-input-option-label')
+                                                      .attr('type','text')
+                                                      .attr('placeholder',c_('label.egName'))
+                                                      .css('width','20%')
+                                                      .css('margin-left','5px')
+                                                      .css('margin-right','5px')
+                                                      .val(option.label)
+                                                      .appendTo(row)
                     },
                     removable: true,
-                    sortable:true
+                    sortable: true
                 })
 
-                // Show all the dropdown options (stored in this node) into the editableList
-                if (this.dropdownOptions) {
-                    this.dropdownOptions.forEach(function(dropdownOption, index) {
-                        dropdownOptionsList.editableList('addItem', dropdownOption)
-                    })
+                for (let i = 0; i < this.dropdownOptions.length; i++) {
+                    const option = this.dropdownOptions[i]
+                    dropdownOptionsList.editableList('addItem', option)
                 }
 
                 // Show tabsheets
@@ -290,7 +320,12 @@
                 let dropdownOptionsList = $("#node-input-dropdown-options-container").editableList('items')
                 dropdownOptionsList.each(function(i) {
                     let dropdownOption = $(this)
-                    node.dropdownOptions.push(dropdownOption.find(".node-input-key").val())
+                    const o = {
+                        dropdown: option.find('.node-input-option-dropdown').val(),
+                        key: option.find('.node-input-option-key').val(),
+                        label: option.find('.node-input-option-label').val()
+                    }
+                    node.dropdownOptions.push(o)
                 })
             },
             oneditresize: function () {
