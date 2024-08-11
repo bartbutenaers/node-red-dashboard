@@ -3,9 +3,33 @@
     <v-form ref="form" v-model="isValid" :disabled="!state.enabled" validate-on="input" @submit.prevent="onSubmit">
         <div class="nrdb-ui-form-rows" :class="{'nrdb-ui-form-rows--split': props.splitLayout}">
             <div v-for="row in options" :key="row.key" class="nrdb-ui-form-row" :data-form="`form-row-${row.key}`">
-                <v-checkbox v-if="row.type === 'checkbox'" v-model="input[row.key]" :label="row.label" hide-details="auto" />
-                <v-select v-else-if="row.type === 'dropdown'" v-model="input[row.key]" class="nrdb-ui-widget" :label="row.label" :class="{'active': state}" hide-details="auto" color="primary" />
-                <v-switch v-else-if="row.type === 'switch'" v-model="input[row.key]" class="nrdb-ui-widget" :label="row.label" :class="{'active': state}" hide-details="auto" color="primary" />
+                <v-checkbox
+                    v-if="row.type === 'checkbox'"
+                    v-model="input[row.key]"
+                    :label="row.label"
+                    hide-details="auto"
+                />
+                <v-select
+                    v-else-if="row.type === 'dropdown'"
+                    v-model="input[row.key]"
+                    class="nrdb-ui-widget"
+                    :label="row.label"
+                    :class="{'active': state}"
+                    hide-details="auto"
+                    color="primary"
+                    :items="filteredDropdownOptions(row.key)"
+                    item-title="label"
+                    item-value="key"
+                />
+                <v-switch
+                    v-else-if="row.type === 'switch'"
+                    v-model="input[row.key]"
+                    class="nrdb-ui-widget"
+                    :label="row.label"
+                    :class="{'active': state}"
+                    hide-details="auto"
+                    color="primary"
+                />
                 <v-textarea
                     v-else-if="row.type === 'multiline'"
                     v-model="input[row.key]" :rules="rules(row)"
@@ -44,7 +68,8 @@ export default {
             isValid: null,
             dynamic: {
                 label: null,
-                options: null
+                options: null,
+                dropdownOptions: null
             }
         }
     },
@@ -55,6 +80,9 @@ export default {
         },
         options: function () {
             return this.dynamic.options !== null ? this.dynamic.options : this.props.options
+        },
+        dropdownOptions: function () {
+            return this.dynamic.dropdownOptions !== null ? this.dynamic.dropdownOptions : this.props.dropdownOptions
         },
         submitEnabled: function () {
             return !(this.isValid && !!this.state.enabled)
@@ -147,6 +175,12 @@ export default {
             if (typeof updates?.options !== 'undefined') {
                 this.dynamic.options = updates.options
             }
+            if (typeof updates?.dropdownOptions !== 'undefined') {
+                this.dynamic.dropdownOptions = updates.dropdownOptions
+            }
+        },
+        filteredDropdownOptions(dropdownName) {
+            return this.dropdownOptions.filter(obj => obj.dropdown == dropdownName)
         }
     }
 }

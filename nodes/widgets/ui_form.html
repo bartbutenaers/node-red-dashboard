@@ -91,6 +91,40 @@ debugger
                     //  option.find(".node-input-option-key").width(newWidth);
                 }
 
+                // Get all the form options of type 'dropdown' (from the first tabsheet)
+                function getDropdowns() {
+                    let dropdowns = [{key: '', label: ''}]
+                    // Create a list of all the available dropdowns
+// TODO replace this afterwards
+//                  let formOptionsList = $('#node-input-options-container').editableList('items')
+                    let formOptionsList = $('#node-input-option-container').children()
+                    formOptionsList.each(function(i) {
+                        let formOption = $(this)
+                        const formOptionType = formOption.find('.node-input-option-type').val()
+                        if (formOptionType == 'dropdown') {
+                            const label = formOption.find('.node-input-option-label').val()
+                            const key = formOption.find('.node-input-option-key').val()
+                            dropdowns.push({label: label, key: key})
+                        }
+                    })
+                    return dropdowns
+                }
+
+                // Show all available dropdowns (from the first tabsheet) in a single dropdown field (on the second tabsheet)
+                function showDropdowns(dropdownNameField, dropdowns, selectedValue) {
+                    // If the currently selected dropdown (in the second tabsheet) doesn't exist anymore (in the first tabsheet),
+                    // then apply an empty selection 
+                    if (dropdowns.filter(obj => obj.key == selectedValue).length == 0) {
+                        selectedValue = ''
+                    }
+
+                    dropdownNameField.empty()
+                    dropdowns.forEach((obj) => {
+                        const isSelected = obj.key == selectedValue
+                        dropdownNameField.append($('<option>').attr('value', obj.key).text(obj.label).prop('selected', isSelected))
+                    })
+                }
+
                 function generateOption (i, option) {
                     const container = $('<li/>', { style: 'margin:0; padding:8px 0px 0px; border-bottom:1px solid var(--red-ui-form-input-border-color, #ccc);' })
                     const row = $('<div/>').appendTo(container)
@@ -221,7 +255,7 @@ debugger
                         delay: 150
                     }
                 })
-
+debugger
                 let dropdownOptionsList = $('#node-input-dropdown-options-container').css('min-height','150px')
                                                                                      .css('min-width','450px')
                                                                                      .editableList({
@@ -235,20 +269,14 @@ debugger
                         let row = $('<div/>').appendTo(container)
 
                         // Dropdown name field
-                        let dropdownNameField = $('<input/>').addClass('node-input-option-dropdown')
-                                                             .attr('type','text')
-                                                             .css('width','20%')
-                                                             .css('margin-left','5px')
-                                                             .css('margin-right','5px')
-                                                             .appendTo(row)
-                        /*TODO fill dropdownNameField options
-                        $(supportedTypes).each(function () {
-                            let isSelected = false
-                            if (option.type === this.val) {
-                                isSelected = true
-                            }
-                            dropdownNameField.append($('<option>').attr('value', this.val).text(this.text).prop('selected', isSelected))
-                        })*/
+                        let dropdownNameField = $('<select/>').addClass('node-input-option-dropdown')
+                                                              .attr('type','text')
+                                                              .css('width','20%')
+                                                              .css('margin-left','5px')
+                                                              .css('margin-right','5px')
+                                                              .appendTo(row)
+                        const dropdowns = getDropdowns()
+                        showDropdowns(dropdownNameField, dropdowns, option.dropdown)
 
                         // Key field
                         let keyField = $('<input/>').addClass('node-input-option-key')
@@ -283,6 +311,20 @@ debugger
                 node.tabs = RED.tabs.create({
                     id: 'node-ui-form-tabsheets',
                     onchange: function(tab) {
+                         // When switching to the dropdown options tabsheet, make sure all the dropdowns (from the first
+                         // tabsheet) are becoming available for selection (in the second tabsheet)
+                         if (tab.id == 'node-ui-form-tabsheet-dropdown-options') {
+debugger
+                             let dropdowns = getDropdowns()
+                             let dropdownOptionsList = $('#node-input-dropdown-options-container').editableList('items')
+                             dropdownOptionsList.each(function(i) {
+                                 let dropdownOption = $(this)
+                                 const dropdownNameField = dropdownOption.find('.node-input-option-dropdown')
+                                 const selectedValue = dropdownNameField.val()
+                                 showDropdowns(dropdownNameField, dropdowns, selectedValue)
+                             })
+                         }
+
                          // Show only the content (i.e. the children) of the selected tabsheet, and hide the others
                          $('#node-ui-form-tabsheets-content').children().hide()
                          $('#' + tab.id).show()
@@ -298,6 +340,7 @@ debugger
                 })
             },
             oneditsave: function () {
+debugger
                 const options = $('#node-input-option-container').children()
                 const node = this
                 node.options = []
@@ -321,9 +364,9 @@ debugger
                 dropdownOptionsList.each(function(i) {
                     let dropdownOption = $(this)
                     const o = {
-                        dropdown: option.find('.node-input-option-dropdown').val(),
-                        key: option.find('.node-input-option-key').val(),
-                        label: option.find('.node-input-option-label').val()
+                        dropdown: dropdownOption.find('.node-input-option-dropdown').val(),
+                        key: dropdownOption.find('.node-input-option-key').val(),
+                        label: dropdownOption.find('.node-input-option-label').val()
                     }
                     node.dropdownOptions.push(o)
                 })
