@@ -4,6 +4,7 @@
             "dropdown": "Dropdown",
             "group": "Group",
             "size": "Size",
+            "key": "Key",
             "label": "Label",
             "optionalLabel": "optional label",
             "className": "Class",
