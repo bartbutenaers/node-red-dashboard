@@ -10,6 +10,7 @@
             "className": "Class",
             "classNamePlaceholder": "Optional CSS class name(s)",
             "formElements": "Form elements",
+            "dropdownOptions": "Dropdown options",
             "type": "Type",
             "required": "Required",
             "rows": "Rows",
