@@ -120,7 +120,23 @@
                 pointShape: { value: 'circle' },
                 pointRadius: { value: 4 },
                 showLegend: { value: true },
-                removeOlder: { value: 1, validate: RED.validators.number(), required: true },
+                outerRadius: { value: 75},
+                innerRadius: {
+                    value: 50,
+                    validate: function (v) {
+                        if (this.chartType !== 'doughnut') {
+                            return true // If not doughnut chart, no need to validate
+                        }
+
+                        // Apply the default values in case of older nodes
+                        const outerRadius = parseInt($('#node-input-outerRadius').val() || 75, 10)
+                        const innerRadius = parseInt(v || 50)
+
+                        // the innerRadius should be less than outerRadius
+                        return (innerRadius < outerRadius)
+                    }
+                },
+                removeOlder: { value: 1, validate: RED.validators.number() },
                 removeOlderUnit: { value: '3600', required: true },
                 removeOlderPoints: { value: '', validate: function (value) { return numberValidator(value, true) } },
                 colors: { value: ['#0095FF', '#FF0000', '#FF7F0E', '#2CA02C', '#A347E1', '#D62728', '#FF9896', '#9467BD', '#C5B0D5'] },
@@ -141,7 +157,9 @@
                 },
                 height: { value: 8 },
                 className: { value: '' },
-                interpolation: { value: 'linear' }
+                interpolation: { value: 'linear' },
+                refreshInterval: { value: 0 },
+                zoomComponent: {value: 'none'}
             },
             inputs: 1,
             outputs: 1,
@@ -156,6 +174,18 @@
             labelStyle: function () { return this.name ? 'node_label_italic' : '' },
             oneditprepare: function () {
                 const node = this
+
+                // Migrate existing nodes
+                if (typeof node.outerRadius === 'undefined') {
+                    $('#node-input-outerRadius').val(75)
+                }
+                if (typeof node.innerRadius === 'undefined') {
+                    $('#node-input-innerRadius').val(50)
+                }
+                if (typeof node.zoomComponent === 'undefined') {
+                    $('#node-input-zoomComponent').val('none')
+                }
+
                 // add "Clear History" button
                 const clearHistoryBtn = $('<button>')
                     .attr('class', 'ui-button ui-corner-all ui-widget leftButton')
@@ -208,8 +238,8 @@
                 // line     : time, linear
                 // bar      : categorical (or just hide)
                 // scatter  : time, linear
-                // pie      : radial
-                // doughnut : radial
+                // pie      : 
+                // doughnut : 
 
                 // handle event when x axis type is changed
                 $('#node-input-xAxisType').on('change', (evt) => {
@@ -222,12 +252,7 @@
                     // default for most: hide the bins
                     $('#node-container-xAxisBins').hide()
 
-                    if (value === 'radial') {
-                        // hide irrelevant fields
-                        $('#node-container-xAxisLabel').hide()
-                        $('#node-container-yAxisLabel').hide()
-                        $('#y-axis-show').hide()
-                    } else if (value === 'bins') {
+                    if (value === 'bins') {
                         $('#node-container-xAxisLabel').show()
                         $('#node-container-yAxisLabel').show()
                         // show the options to configure the histogram bins
@@ -285,7 +310,6 @@
                     const allOptions = [
                         { value: 'time', text: RED._('@flowfuse/node-red-dashboard/ui-chart:ui-chart.label.timescale') },
                         { value: 'linear', text: RED._('@flowfuse/node-red-dashboard/ui-chart:ui-chart.label.linear') },
-                        { value: 'radial', text: RED._('@flowfuse/node-red-dashboard/ui-chart:ui-chart.label.radial') },
                         { value: 'category', text: RED._('@flowfuse/node-red-dashboard/ui-chart:ui-chart.label.categorical') },
                         { value: 'bins', text: RED._('@flowfuse/node-red-dashboard/ui-chart:ui-chart.label.binsAxis') }
                     ]
@@ -314,55 +338,47 @@
                 $('#node-input-chartType').on('change', (evt) => {
                     const value = $(evt.target).val()
 
-                    const interpolationWrapper = $('#interpolation-wrapper')
-                    interpolationWrapper.hide()
+                    // Hide all the fields depending on the type of chart
+                    $('.chart-type-dependent').hide()
 
-                    if (value === 'line' || value === 'scatter') {
-                        // for line and scatter
-                        // types - time, linear
+                    // Show all the fields related to the selected chart type
+                    switch (value) {
+                    case 'line':
                         updateXAxisTypeOptions(['time', 'linear'], 'time')
-                        // no concept of stacking in line/scatter charts
-                        $('#config-stackSeries').hide()
-                        // show x-axis limit options & points sizing
+                        $('#config-stackSeries').show()
+                        $('#refresh-interval').show()
+                        $('#x-axis-type').show()
                         $('#x-axis-show').show()
                         $('#point-radius-show').show()
-                        if (value === 'line') {
-                            interpolationWrapper.show()
-                        }
-                    } else if (value === 'pie' || value === 'doughnut') {
-                        // for pie/doughnut
-                        // types - radial
-                        updateXAxisTypeOptions(['radial'], 'radial')
-                        // no stacking options in pie/doughnut charts
-                        $('#config-stackSeries').hide()
-                        // hide x-axis limit options & points sizing
-                        $('#x-axis-show').hide()
-                        $('#point-radius-show').hide()
-                    } else if (value === 'histogram') {
-                        // for histogram
-                        // types - categorical
+                        $('#interpolation-wrapper').show()
+                        break
+                    case 'scatter':
+                        updateXAxisTypeOptions(['time', 'linear'], 'time')
+                        $('#config-stackSeries').show()
+                        $('#refresh-interval').show()
+                        $('#x-axis-type').show()
+                        $('#x-axis-show').show()
+                        $('#point-radius-show').show()
+                        $('#point-radius-show').show()
+                        break
+                    case 'pie':
+                        $('#outer-radius').show()
+                        break
+                    case 'doughnut':
+                        $('#outer-radius').show()
+                        $('#inner-radius').show()
+                        break
+                    case 'histogram':
                         updateXAxisTypeOptions(['bins', 'category'], 'bins')
-                        // no need for a y-axis property as it's a frequency chart
-                        $('#node-container-yAxisProperty').hide()
-
-                        // show the ability to control if content is stacked or not
+                        $('#x-axis-type').show()
                         $('#config-stackSeries').show()
-
                         $('#node-container-xAxisLabel').show()
-                        $('#node-container-yAxisLabel').hide()
-
-                        // hide x-axis limit options & points sizing
-                        $('#x-axis-show').hide()
-                        $('#point-radius-show').hide()
-                    } else if (value === 'bar') {
-                        // for bar
-                        // types - categorical
+                        break
+                    case 'bar':
                         updateXAxisTypeOptions(['category'], 'category')
-                        // show the ability to control if content is stacked or not
+                        $('#x-axis-type').show()
                         $('#config-stackSeries').show()
-                        // hide x-axis limit options & points sizing
-                        $('#x-axis-show').hide()
-                        $('#point-radius-show').hide()
+                        break
                     }
                 })
 
@@ -512,42 +528,6 @@
             </a>
         </div>
     </div>
-    <h4>Chart Configuration</h4>
-    <div class="form-row" style="display: flex; align-items: center; gap: 36px;">
-        <div>
-            <label for="node-input-chartType"><i class="fa fa-bar-chart"></i> <span data-i18n="ui-chart.label.type"></span></label>
-            <select id="node-input-chartType">
-                <option value="line" data-i18n="ui-chart.label.line"></option>
-                <option value="bar" data-i18n="ui-chart.label.bar"></option>
-                <option value="scatter" data-i18n="ui-chart.label.scatter"></option>
-                <option value="pie" data-i18n="ui-chart.label.pie"></option>
-                <option value="doughnut" data-i18n="ui-chart.label.doughnut"></option>
-                <option value="histogram" data-i18n="ui-chart.label.histogram"></option>
-            </select>
-        </div>
-        <div>
-            <label style="width:auto" for="node-input-showLegend"><i class="fa fa-th-list"></i> <span data-i18n="ui-chart.label.showLegend"></span></label>
-            <input type="checkbox" checked id="node-input-showLegend" style="display: inline-block; width: auto; margin: 0px 0px 0px 4px;">
-        </div>
-    </div>
-    <div id="interpolation-wrapper" class="form-row">
-        <label for="node-input-interpolation" data-i18n="ui-chart.label.interpolation"></label></label>
-        <select id="node-input-interpolation">
-            <option value="linear" data-i18n="ui-chart.label.linearInterpolation"></option>
-            <option value="step" data-i18n="ui-chart.label.stepInterpolation"></option>
-            <option value="bezier" data-i18n="ui-chart.label.bezierInterpolation"></option>
-            <option value="cubic" data-i18n="ui-chart.label.cubicInterpolation"></option>
-            <option value="cubicMono" data-i18n="ui-chart.label.cubicMonoInterpolation"></option>
-        </select>
-    </div>
-    <div class="form-row" id="config-stackSeries">
-        <!-- do not use node-input here to prevent NR automatic binding -->
-        <label for="chart-input-stackSeries"><i class="fa fa-bookmark"></i> <span data-i18n="ui-chart.label.stackSeries"></span></label>
-        <select id="chart-input-stackSeries">
-            <option value="true" data-i18n="ui-chart.label.stackSeriesTrue"></option>
-            <option value="false" data-i18n="ui-chart.label.stackSeriesFalse"></option>
-        </select>
-    </div>
     <div class="form-row">
         <label for="node-input-action" data-i18n="ui-chart.label.action"></label></label>
         <select id="node-input-action">
@@ -555,139 +535,210 @@
             <option value="replace" data-i18n="ui-chart.label.replace"></option>
         </select>
     </div>
-    <div class="form-row form-row-flex" id="point-radius-show">
-        <label for="node-input-pointRadius" data-i18n="ui-chart.label.pointStyle"></label>
-        <div style="display: flex; align-items: center; gap: 36px;">
+    <fieldset>
+        <legend>Chart Configuration</legend>
+        <div class="form-row" style="display: flex; align-items: center; gap: 36px;">
             <div>
-                <label for="node-input-pointShape" style="width: auto; display: none;" data-i18n="ui-chart.label.pointShape"></label>
-                <select id="node-input-pointShape">
-                    <option value="circle" data-i18n="ui-chart.label.circle"></option>
-                    <option value="cross" data-i18n="ui-chart.label.cross"></option>
-                    <option value="crossRot" data-i18n="ui-chart.label.crossRotated"></option>
-                    <option value="dash" data-i18n="ui-chart.label.dash"></option>
-                    <option value="line" data-i18n="ui-chart.label.line2"></option>
-                    <option value="rect" data-i18n="ui-chart.label.rectangle"></option>
-                    <option value="rectRounded" data-i18n="ui-chart.label.roundedRectangle"></option>
-                    <option value="rectRot" data-i18n="ui-chart.label.rotatedRectangle"></option>
-                    <option value="star" data-i18n="ui-chart.label.star"></option>
-                    <option value="triangle" data-i18n="ui-chart.label.triangle"></option>
-                    <option value="false" data-i18n="ui-chart.label.none"></option>
+                <label for="node-input-chartType"><i class="fa fa-bar-chart"></i> <span data-i18n="ui-chart.label.type"></span></label>
+                <select id="node-input-chartType">
+                    <option value="line" data-i18n="ui-chart.label.line"></option>
+                    <option value="bar" data-i18n="ui-chart.label.bar"></option>
+                    <option value="scatter" data-i18n="ui-chart.label.scatter"></option>
+                    <option value="pie" data-i18n="ui-chart.label.pie"></option>
+                    <option value="doughnut" data-i18n="ui-chart.label.doughnut"></option>
+                    <option value="histogram" data-i18n="ui-chart.label.histogram"></option>
                 </select>
             </div>
             <div>
-                <label for="node-input-pointRadius" style="width: auto;" data-i18n="ui-chart.label.pointRadius"></label>
-                <input type="number" id="node-input-pointRadius">
+                <label style="width:auto" for="node-input-showLegend"><i class="fa fa-th-list"></i> <span data-i18n="ui-chart.label.showLegend"></span></label>
+                <input type="checkbox" checked id="node-input-showLegend" style="display: inline-block; width: auto; margin: 0px 0px 0px 4px;">
             </div>
         </div>
-    </div>
-    <h4>Axis Configuration</h4>
-    <div class="form-row">
-        <label for="node-input-xAxisType" data-i18n="ui-chart.label.xType"></label></label>
-        <select id="node-input-xAxisType"> </select>
-    </div>
-    <div class="form-row" id="x-axis-format">
-        <label for="node-input-xAxisFormat" data-i18n="ui-chart.label.xFormat"></label></label>
-        <input type="text" id="node-input-xAxisFormat">
-        <input type="hidden" id="node-input-xAxisFormatType">
-    </div>
-    <div class="form-row" id="node-container-xAxisLabel">
-        <label for="node-input-xAxisLabel" data-i18n="ui-chart.label.xLabel"></label></label>
-        <input type="text" id="node-input-xAxisLabel">
-    </div>
-    <div class="form-row" id="node-container-xAxisBins">
-        <label id="y-label-show" for="node-input-ymin" data-i18n="ui-chart.label.xAxis"></label>
-        <label for="node-input-xmin" style="width:auto" data-i18n="ui-chart.label.min"></label>
-        <input type="text" id="node-input-xmin" style="width:92px">
-        <label for="node-input-bins" style="width:auto; margin-left:20px;" data-i18n="ui-chart.label.bins"></label>
-        <input type="text" id="node-input-bins" style="width:92px">
-        <label for="node-input-xmax" style="width:auto; margin-left:20px;" data-i18n="ui-chart.label.max"></label>
-        <input type="text" id="node-input-xmax" style="width:92px">
-    </div>
-    <div class="form-row" id="x-axis-show">
-        <label for="node-input-removeOlder" data-i18n="ui-chart.label.xLimit"></label>
-        <label for="node-input-removeOlder" style="width:auto" data-i18n="ui-chart.label.last"></label>
-        <input type="text" id="node-input-removeOlder" style="width:50px;">
-        <select id="node-input-removeOlderUnit" style="width:100px;">
-            <option value="1" data-i18n="ui-chart.label.seconds"></option>
-            <option value="60" data-i18n="ui-chart.label.minutes"></option>
-            <option value="3600" data-i18n="ui-chart.label.hours"></option>
-            <option value="86400" data-i18n="ui-chart.label.days"></option>
-            <option value="604800" data-i18n="ui-chart.label.weeks"></option>
-        </select>
-        <label for="node-input-removeOlderPoints" style="width:auto; margin-left:10px; margin-right:10px;" data-i18n="ui-chart.label.or"></label>
-        <input type="text" id="node-input-removeOlderPoints" style="width:60px;" placeholder="1000">
-        <span style="margin-left:5px;" data-i18n="ui-chart.label.points"></span>
-    </div>
-    <div class="form-row" id="node-container-yAxisLabel">
-        <label for="node-input-yAxisLabel" data-i18n="ui-chart.label.yLabel"></label></label>
-        <input type="text" id="node-input-yAxisLabel">
-    </div>
-    <div class="form-row" id="y-axis-show">
-        <label id="y-label-show" for="node-input-ymin" data-i18n="ui-chart.label.yAxis"></label>
-        <label for="node-input-ymin" style="width:auto" data-i18n="ui-chart.label.min"></label>
-        <input type="text" id="node-input-ymin" style="width:92px">
-        <label for="node-input-ymax" style="width:auto; margin-left:20px;" data-i18n="ui-chart.label.max"></label>
-        <input type="text" id="node-input-ymax" style="width:92px">
-    </div>
-    <div class="form-row">
-        <label data-i18n="ui-chart.label.properties"></label>
-        <div id="node-container-axisKeys" class="node-chart-properties">
-            <div id="node-container-category" class="node-chart-property">
-                <label style="width: auto" for="node-input-category" data-i18n="ui-chart.label.series"></label>
-                <input style="flex-grow: 1" type="text" id="node-input-category" placeholder="topic">
-                <input type="hidden" id="node-input-categoryType">
-            </div>
-            <div id="node-container-xAxisProperty" class="node-chart-property">
-                <label style="width: auto" for="node-input-xAxisProperty">X:</label>
-                <input style="flex-grow: 1" type="text" id="node-input-xAxisProperty" data-i18n="[placeholder]ui-chart.label.propertyPlaceholder">
-                <input type="hidden" id="node-input-xAxisPropertyType">
-            </div>
-            <div id="node-container-yAxisProperty" class="node-chart-property">
-                <label style="width: auto" for="node-input-yAxisProperty">Y:</label>
-                <input type="hidden" id="node-input-yAxisPropertyType">
-                <input style="flex-grow: 1" type="text" id="node-input-yAxisProperty" data-i18n="[placeholder]ui-chart.label.propertyPlaceholder">
+        <div class="form-row chart-type-dependent" id="interpolation-wrapper">
+            <label for="node-input-interpolation" data-i18n="ui-chart.label.interpolation"></label></label>
+            <select id="node-input-interpolation">
+                <option value="linear" data-i18n="ui-chart.label.linearInterpolation"></option>
+                <option value="step" data-i18n="ui-chart.label.stepInterpolation"></option>
+                <option value="bezier" data-i18n="ui-chart.label.bezierInterpolation"></option>
+                <option value="cubic" data-i18n="ui-chart.label.cubicInterpolation"></option>
+                <option value="cubicMono" data-i18n="ui-chart.label.cubicMonoInterpolation"></option>
+            </select>
+        </div>
+        <div class="form-row chart-type-dependent" id="config-stackSeries">
+            <!-- do not use node-input here to prevent NR automatic binding -->
+            <label for="chart-input-stackSeries"><i class="fa fa-bookmark"></i> <span data-i18n="ui-chart.label.stackSeries"></span></label>
+            <select id="chart-input-stackSeries">
+                <option value="true" data-i18n="ui-chart.label.stackSeriesTrue"></option>
+                <option value="false" data-i18n="ui-chart.label.stackSeriesFalse"></option>
+            </select>
+        </div>
+        <div class="form-row chart-type-dependent form-row-flex" id="point-radius-show">
+            <label for="node-input-pointRadius" data-i18n="ui-chart.label.pointStyle"></label>
+            <div style="display: flex; align-items: center; gap: 36px;">
+                <div>
+                    <label for="node-input-pointShape" style="width: auto; display: none;" data-i18n="ui-chart.label.pointShape"></label>
+                    <select id="node-input-pointShape">
+                        <option value="circle" data-i18n="ui-chart.label.circle"></option>
+                        <option value="cross" data-i18n="ui-chart.label.cross"></option>
+                        <option value="crossRot" data-i18n="ui-chart.label.crossRotated"></option>
+                        <option value="dash" data-i18n="ui-chart.label.dash"></option>
+                        <option value="line" data-i18n="ui-chart.label.line2"></option>
+                        <option value="rect" data-i18n="ui-chart.label.rectangle"></option>
+                        <option value="rectRounded" data-i18n="ui-chart.label.roundedRectangle"></option>
+                        <option value="rectRot" data-i18n="ui-chart.label.rotatedRectangle"></option>
+                        <option value="star" data-i18n="ui-chart.label.star"></option>
+                        <option value="triangle" data-i18n="ui-chart.label.triangle"></option>
+                        <option value="false" data-i18n="ui-chart.label.none"></option>
+                    </select>
+                </div>
+                <div>
+                    <label for="node-input-pointRadius" style="width: auto;" data-i18n="ui-chart.label.pointRadius"></label>
+                    <input type="number" id="node-input-pointRadius">
+                </div>
             </div>
         </div>
-    </div>
-    <h4>Styling/Colors</h4>
-    <div class="form-row" id="ui-chart-colors">
-        <label for="node-input-color1" data-i18n="ui-chart.label.seriesColors"></label>
-        <input type="color" id="node-input-color1" class="series-color" style="width:100px;"/>
-        <input type="color" id="node-input-color2" class="series-color" style="width:100px;"/>
-        <input type="color" id="node-input-color3" class="series-color" style="width:100px;"/>
-        <div style="margin-top:5px; margin-left:104px;">
-            <input type="color" id="node-input-color4" class="series-color" style="width:100px;"/>
-            <input type="color" id="node-input-color5" class="series-color" style="width:100px;"/>
-            <input type="color" id="node-input-color6" class="series-color" style="width:100px;"/>
+        <div class="form-row chart-type-dependent" id="outer-radius">
+            <label for="node-input-outerRadius" data-i18n="ui-chart.label.outerRadius"></label>
+            <input type="number" id="node-input-outerRadius" min="0" max="100">
+            <span style="margin-left:5px;">%</span>
         </div>
-        <div style="margin-top:5px; margin-left:104px;">
-            <input type="color" id="node-input-color7" class="series-color" style="width:100px;"/>
-            <input type="color" id="node-input-color8" class="series-color" style="width:100px;"/>
-            <input type="color" id="node-input-color9" class="series-color" style="width:100px;"/>
+        <div class="form-row chart-type-dependent" id="inner-radius">
+            <label for="node-input-innerRadius" data-i18n="ui-chart.label.innerRadius"></label>
+            <input type="number" id="node-input-innerRadius" min="0" max="100">
+            <span style="margin-left:5px;">%</span>
         </div>
-    </div>
-    <div class="form-row" style="display: flex; align-items: center; gap: 36px; height: 34px;">
-        <div>
-            <label for="node-chart-text-color" data-i18n="ui-chart.label.textColor"></label>
+        <div class="form-row chart-type-dependent" id="refresh-interval">
+            <label for="node-input-refreshInterval" data-i18n="ui-chart.label.refresh"></label>
+            <input type="number" id="node-input-refreshInterval" min="0">
+            <span style="margin-left:5px;">msec</span>
         </div>
-        <div>
-            <input type="checkbox" checked id="node-input-textColorDefault" style="display: inline-block; width: auto; margin: 0px 0px 0px 4px;" onclick="this.checked ? $('#node-chart-text-color').hide(): $('#node-chart-text-color').show()">
-            <label style="width:auto" for="node-input-textColorDefault"> <span data-i18n="ui-chart.label.setTextColorDefault"></span></label>
+    </fieldset>
+    <fieldset>
+        <legend>Axis Configuration</legend>
+        <div class="form-row chart-type-dependent" id="x-axis-type">
+            <label for="node-input-xAxisType" data-i18n="ui-chart.label.xType"></label>
+            <select id="node-input-xAxisType"> </select>
         </div>
-        <div>
-            <input type="color" id="node-chart-text-color" class="series-color" style="width:100px;"/>
+        <div class="form-row chart-type-dependent" id="x-axis-format">
+            <label for="node-input-xAxisFormat" data-i18n="ui-chart.label.xFormat"></label>
+            <input type="text" id="node-input-xAxisFormat">
+            <input type="hidden" id="node-input-xAxisFormatType">
         </div>
-    </div>
-    <div class="form-row" style="display: flex; align-items: center; gap: 36px; height: 34px;">
-        <div>
-            <label for="node-chart-grid-color" data-i18n="ui-chart.label.gridColor"></label>
+        <div class="form-row chart-type-dependent" id="node-container-xAxisLabel">
+            <label for="node-input-xAxisLabel" data-i18n="ui-chart.label.xLabel"></label>
+            <input type="text" id="node-input-xAxisLabel">
         </div>
-        <div>
-           <input type="checkbox" checked id="node-input-gridColorDefault" style="display: inline-block; width: auto; margin: 0px 0px 0px 4px;" onclick="this.checked ? $('#node-chart-grid-color').hide() : $('#node-chart-grid-color').show()">
-           <label style="width:auto" for="node-input-gridColorDefault"> <span data-i18n="ui-chart.label.setGridColorDefault"></span></label>
+        <div class="form-row chart-type-dependent" id="node-container-xAxisBins">
+            <label id="y-label-show" for="node-input-ymin" data-i18n="ui-chart.label.xAxis"></label>
+            <label for="node-input-xmin" style="width:auto" data-i18n="ui-chart.label.min"></label>
+            <input type="text" id="node-input-xmin" style="width:92px">
+            <label for="node-input-bins" style="width:auto; margin-left:20px;" data-i18n="ui-chart.label.bins"></label>
+            <input type="text" id="node-input-bins" style="width:92px">
+            <label for="node-input-xmax" style="width:auto; margin-left:20px;" data-i18n="ui-chart.label.max"></label>
+            <input type="text" id="node-input-xmax" style="width:92px">
         </div>
-        <div>
-            <input type="color" id="node-chart-grid-color" class="series-color" style="width:100px;"/>
+        <div class="form-row chart-type-dependent" id="x-axis-show">
+            <label for="node-input-removeOlder" data-i18n="ui-chart.label.xLimit"></label>
+            <label for="node-input-removeOlder" style="width:auto" data-i18n="ui-chart.label.last"></label>
+            <input type="text" id="node-input-removeOlder" style="width:50px;">
+            <select id="node-input-removeOlderUnit" style="width:100px;">
+                <option value="1" data-i18n="ui-chart.label.seconds"></option>
+                <option value="60" data-i18n="ui-chart.label.minutes"></option>
+                <option value="3600" data-i18n="ui-chart.label.hours"></option>
+                <option value="86400" data-i18n="ui-chart.label.days"></option>
+                <option value="604800" data-i18n="ui-chart.label.weeks"></option>
+            </select>
+            <label for="node-input-removeOlderPoints" style="width:auto; margin-left:10px; margin-right:10px;" data-i18n="ui-chart.label.or"></label>
+            <input type="text" id="node-input-removeOlderPoints" style="width:60px;" placeholder="1000">
+            <span style="margin-left:5px;" data-i18n="ui-chart.label.points"></span>
         </div>
-    </div>
+        <div class="form-row chart-type-dependent" id="node-container-yAxisLabel">
+            <label for="node-input-yAxisLabel" data-i18n="ui-chart.label.yLabel"></label></label>
+            <input type="text" id="node-input-yAxisLabel">
+        </div>
+        <div class="form-row chart-type-dependent" id="y-axis-show">
+            <label id="y-label-show" for="node-input-ymin" data-i18n="ui-chart.label.yAxis"></label>
+            <label for="node-input-ymin" style="width:auto" data-i18n="ui-chart.label.min"></label>
+            <input type="text" id="node-input-ymin" style="width:92px">
+            <label for="node-input-ymax" style="width:auto; margin-left:20px;" data-i18n="ui-chart.label.max"></label>
+            <input type="text" id="node-input-ymax" style="width:92px">
+        </div>
+    </fieldset>
+    <fieldset>
+        <legend>Data extraction</legend>
+        <div class="form-row">
+            <label data-i18n="ui-chart.label.properties"></label>
+            <div id="node-container-axisKeys" class="node-chart-properties">
+                <div id="node-container-category" class="node-chart-property">
+                    <label style="width: auto" for="node-input-category" data-i18n="ui-chart.label.series"></label>
+                    <input style="flex-grow: 1" type="text" id="node-input-category" placeholder="topic">
+                    <input type="hidden" id="node-input-categoryType">
+                </div>
+                <div id="node-container-xAxisProperty" class="node-chart-property">
+                    <label style="width: auto" for="node-input-xAxisProperty">X:</label>
+                    <input style="flex-grow: 1" type="text" id="node-input-xAxisProperty" data-i18n="[placeholder]ui-chart.label.propertyPlaceholder">
+                    <input type="hidden" id="node-input-xAxisPropertyType">
+                </div>
+                <div id="node-container-yAxisProperty" class="node-chart-property">
+                    <label style="width: auto" for="node-input-yAxisProperty">Y:</label>
+                    <input type="hidden" id="node-input-yAxisPropertyType">
+                    <input style="flex-grow: 1" type="text" id="node-input-yAxisProperty" data-i18n="[placeholder]ui-chart.label.propertyPlaceholder">
+                </div>
+            </div>
+        </div>
+    </fieldset>
+    <fieldset>
+        <legend>Styling/Colors</legend>
+        <div class="form-row" id="ui-chart-colors">
+            <label for="node-input-color1" data-i18n="ui-chart.label.seriesColors"></label>
+            <input type="color" id="node-input-color1" class="series-color" style="width:100px;"/>
+            <input type="color" id="node-input-color2" class="series-color" style="width:100px;"/>
+            <input type="color" id="node-input-color3" class="series-color" style="width:100px;"/>
+            <div style="margin-top:5px; margin-left:104px;">
+                <input type="color" id="node-input-color4" class="series-color" style="width:100px;"/>
+                <input type="color" id="node-input-color5" class="series-color" style="width:100px;"/>
+                <input type="color" id="node-input-color6" class="series-color" style="width:100px;"/>
+            </div>
+            <div style="margin-top:5px; margin-left:104px;">
+                <input type="color" id="node-input-color7" class="series-color" style="width:100px;"/>
+                <input type="color" id="node-input-color8" class="series-color" style="width:100px;"/>
+                <input type="color" id="node-input-color9" class="series-color" style="width:100px;"/>
+            </div>
+        </div>
+        <div class="form-row" style="display: flex; align-items: center; gap: 36px; height: 34px;">
+            <div>
+                <label for="node-chart-text-color" data-i18n="ui-chart.label.textColor"></label>
+            </div>
+            <div>
+                <input type="checkbox" checked id="node-input-textColorDefault" style="display: inline-block; width: auto; margin: 0px 0px 0px 4px;" onclick="this.checked ? $('#node-chart-text-color').hide(): $('#node-chart-text-color').show()">
+                <label style="width:auto" for="node-input-textColorDefault"> <span data-i18n="ui-chart.label.setTextColorDefault"></span></label>
+            </div>
+            <div>
+                <input type="color" id="node-chart-text-color" class="series-color" style="width:100px;"/>
+            </div>
+        </div>
+        <div class="form-row" style="display: flex; align-items: center; gap: 36px; height: 34px;">
+            <div>
+                <label for="node-chart-grid-color" data-i18n="ui-chart.label.gridColor"></label>
+            </div>
+            <div>
+            <input type="checkbox" checked id="node-input-gridColorDefault" style="display: inline-block; width: auto; margin: 0px 0px 0px 4px;" onclick="this.checked ? $('#node-chart-grid-color').hide() : $('#node-chart-grid-color').show()">
+            <label style="width:auto" for="node-input-gridColorDefault"> <span data-i18n="ui-chart.label.setGridColorDefault"></span></label>
+            </div>
+            <div>
+                <input type="color" id="node-chart-grid-color" class="series-color" style="width:100px;"/>
+            </div>
+        </div>
+    </fieldset>
+    <fieldset>
+        <legend>Extra</legend>
+        <div class="form-row">
+            <label for="node-input-zoomComponent" data-i18n="ui-chart.label.zoomComponent"></label></label>
+            <select id="node-input-zoomComponent">
+                <option value="inside" data-i18n="ui-chart.label.inside"></option>
+                <option value="slider" data-i18n="ui-chart.label.slider"></option>
+                <option value="none" data-i18n="ui-chart.label.none"></option>
+            </select>
+        </div>
+    </fieldset>
 </script>

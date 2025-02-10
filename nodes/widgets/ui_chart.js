@@ -174,7 +174,7 @@ module.exports = function (RED) {
                     datastore.save(base, node, [])
                 }
                 if (Array.isArray(msg.payload) && !msg.payload.length) {
-                    // clear history
+                    // Empty array so clear history
                     datastore.save(base, node, [])
                 } else {
                     if (config.action === 'replace') {
@@ -187,7 +187,7 @@ module.exports = function (RED) {
                             ...msg
                         })
                     } else {
-                        // we have an array in msg.payload, let's split them
+                        // Convert the array of datapoints in the msg.payload to an array of messages (containing a single datapoint)
                         msg.payload.forEach((p, i) => {
                             const payload = JSON.parse(JSON.stringify(p))
                             const d = msg._datapoint ? msg._datapoint[i] : null
